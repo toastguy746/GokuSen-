@@ -21,16 +21,11 @@ body {
   background-position: center;
   background-repeat: no-repeat;
 
-  /* 모바일 제스처 방지 (게임처럼 동작) */
-  touch-action: manipulation;
+  /* 전체 화면에서 range 슬라이더 터치 막지 않게 auto */
+  touch-action: auto;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-}
-
-/* 사운드 재생 중 입력 봉인 */
-body.locked {
-  pointer-events: none;
 }
 
 /* ===== 상단 허용오차 슬라이더 ===== */
@@ -50,6 +45,7 @@ body.locked {
   grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
+  z-index: 10;
 }
 
 .tolerance-wrap input[type="range"] {
@@ -69,6 +65,14 @@ body.locked {
   border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   overflow: hidden;
+
+  /* 게임 영역에서만 제스처 최소화 */
+  touch-action: manipulation;
+  z-index: 5;
+}
+
+.slider-shell.locked {
+  pointer-events: none; /* 성공 사운드 나오는 동안 타이머바만 잠금 */
 }
 
 .slider-fill {
@@ -85,6 +89,7 @@ body.locked {
   opacity: 0;
   pointer-events: none;
   transition: opacity 80ms linear;
+  z-index: 20;
 }
 
 .flash.on {
@@ -101,7 +106,7 @@ body.locked {
   <div><span id="tolOut">10.0</span> ms</div>
 </div>
 
-<div class="slider-shell">
+<div class="slider-shell" id="gameArea">
   <div class="slider-fill" id="fill"></div>
 </div>
 
@@ -115,6 +120,7 @@ const flash = document.getElementById("flash");
 const sound = document.getElementById("successSound");
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
+const gameArea = document.getElementById("gameArea");
 
 let toleranceMs = parseFloat(tolInput.value);
 tolOut.textContent = toleranceMs.toFixed(1);
@@ -124,8 +130,8 @@ tolInput.addEventListener("input", () => {
   tolOut.textContent = toleranceMs.toFixed(1);
 });
 
-const TARGET_MS = 1000;
-const FADE_MS = 700;
+const TARGET_MS = 1000;   // 목표 1초
+const FADE_MS = 700;      // 페이드아웃 길이
 const TICK_MS = 20;
 
 let running = false;
@@ -160,9 +166,18 @@ function resetBar() {
   startPerf = 0;
 }
 
-function unlockAndReset() {
+function lockGameArea() {
+  locked = true;
+  gameArea.classList.add("locked");
+}
+
+function unlockGameArea() {
   locked = false;
-  document.body.classList.remove("locked");
+  gameArea.classList.remove("locked");
+}
+
+function unlockAndReset() {
+  unlockGameArea();
   resetBar();
 }
 
@@ -212,9 +227,7 @@ function scheduleFadeNearEnd() {
 }
 
 function success() {
-  locked = true;
-  document.body.classList.add("locked");
-
+  lockGameArea();
   flashOn();
 
   clearFadeTimers();
@@ -222,6 +235,7 @@ function success() {
   sound.currentTime = 0;
   sound.volume = 1;
 
+  // 끝나면 무조건 풀기+초기화 (영구락 방지)
   sound.onended = () => {
     clearFadeTimers();
     sound.volume = 1;
@@ -231,7 +245,10 @@ function success() {
   const p = sound.play();
 
   if (p && typeof p.then === "function") {
-    p.then(scheduleFadeNearEnd).catch(unlockAndReset);
+    p.then(scheduleFadeNearEnd).catch(() => {
+      // 재생 실패 시(정책/파일문제) 바로 복구
+      unlockAndReset();
+    });
   } else {
     scheduleFadeNearEnd();
   }
@@ -244,20 +261,28 @@ function toggle() {
   else stop();
 }
 
+/* 키보드 Space (PC) */
 document.addEventListener("keydown", (e) => {
   if (e.code !== "Space") return;
   e.preventDefault();
   toggle();
 });
 
-document.addEventListener("touchstart", (e) => {
+/* 모바일: 게임 바(아래 타이머바) 터치로만 토글 (슬라이더 터치 방해 X) */
+gameArea.addEventListener("touchstart", (e) => {
   e.preventDefault();
   toggle();
 }, { passive: false });
 
-document.addEventListener("mousedown", () => {
+/* PC: 게임 바 클릭으로도 토글 */
+gameArea.addEventListener("mousedown", () => {
   toggle();
 });
+
+/* 모바일: 첫 터치에서 오디오 준비(안전장치) */
+document.addEventListener("touchstart", () => {
+  sound.load();
+}, { once: true, passive: true });
 </script>
 
 </body>
