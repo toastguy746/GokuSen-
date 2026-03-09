@@ -22,7 +22,6 @@ body {
   user-select: none;
 }
 
-/* 화면 쉐이크 */
 body.shake {
   animation: screenShake 0.25s;
 }
@@ -36,7 +35,6 @@ body.shake {
   100% { transform: translate(0,0); }
 }
 
-/* 배경 */
 .bg {
   position: fixed;
   inset: 0;
@@ -55,7 +53,6 @@ body.shake {
   background-size: contain;
 }
 
-/* 허용오차 */
 .tolerance-wrap {
   position: fixed;
   left: 50%;
@@ -78,11 +75,6 @@ body.shake {
   width: 100%;
 }
 
-#tolOut {
-  color: #fff;
-}
-
-/* 결과창 */
 .result-wrap {
   position: fixed;
   left: 50%;
@@ -99,7 +91,6 @@ body.shake {
   display: none;
 }
 
-/* 타이머 바 */
 .slider-shell {
   position: fixed;
   left: 50%;
@@ -121,6 +112,7 @@ body.shake {
   background: linear-gradient(90deg, #ff2a2a, #ff0000);
 }
 
+/* 기본 성공 플래시 (빨강) */
 .flash {
   position: fixed;
   inset: 0;
@@ -131,7 +123,22 @@ body.shake {
   z-index: 20;
 }
 
-.flash.on { opacity: 1; }
+/* 도전과제 플래시 (검정) */
+.flash-black {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms linear;
+  z-index: 21;
+}
+
+.flash.on,
+.flash-black.on {
+  opacity: 1;
+}
+
 </style>
 </head>
 
@@ -154,10 +161,14 @@ body.shake {
 </div>
 
 <div class="flash" id="flash"></div>
+<div class="flash-black" id="flashBlack"></div>
 
 <script>
+
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
+const flashBlack = document.getElementById("flashBlack");
+
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
 const gameArea = document.getElementById("gameArea");
@@ -176,7 +187,6 @@ let running = false;
 let startPerf = 0;
 let raf = null;
 
-/* WebAudio */
 let audioCtx;
 let successBuffer;
 
@@ -219,6 +229,7 @@ function start(){
 }
 
 function stop(){
+
   running = false;
   if (raf) cancelAnimationFrame(raf);
 
@@ -233,7 +244,7 @@ function stop(){
     success();
   } else {
     const direction = diff > 0 ? "늦음" : "빠름";
-    result.innerHTML = `실패 ❌ ${absDiff.toFixed(1)} ms ${direction}`;
+    result.innerHTML = `실패 ${absDiff.toFixed(1)} ms ${direction}`;
     result.style.display = "block";
   }
 }
@@ -241,15 +252,33 @@ function stop(){
 function success(){
 
   document.body.classList.add("shake");
-  flash.classList.add("on");
+
+  /* 도전과제 성공 (0.1ms) */
+  if(toleranceMs <= 0.1){
+
+    flashBlack.classList.add("on");
+
+    setTimeout(()=>{
+      flashBlack.classList.remove("on");
+      document.body.classList.remove("shake");
+      fill.style.width = "0%";
+    },400);
+
+  } 
+  /* 일반 성공 */
+  else {
+
+    flash.classList.add("on");
+
+    setTimeout(()=>{
+      flash.classList.remove("on");
+      document.body.classList.remove("shake");
+      fill.style.width = "0%";
+    },400);
+
+  }
 
   playSound();
-
-  setTimeout(()=>{
-    flash.classList.remove("on");
-    document.body.classList.remove("shake");
-    fill.style.width = "0%";
-  },400);
 }
 
 function toggle(){
@@ -270,6 +299,7 @@ gameArea.addEventListener("pointerdown",(e)=>{
   initAudio();
   toggle();
 });
+
 </script>
 
 </body>
