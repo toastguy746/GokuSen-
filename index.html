@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>흑섬 타이밍</title>
+<title>흑섬</title>
 
 <style>
 html, body {
@@ -16,19 +16,46 @@ html, body {
 body {
   min-height: 100vh;
   overflow: hidden;
-  background-image: url("./bg.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-
-  /* 전체 화면에서 range 슬라이더 터치 막지 않게 auto */
+  background: #000;
   touch-action: auto;
   -webkit-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;
 }
 
-/* ===== 상단 허용오차 슬라이더 ===== */
+/* 화면 쉐이크 */
+body.shake {
+  animation: screenShake 0.25s;
+}
+
+@keyframes screenShake {
+  0% { transform: translate(0,0); }
+  20% { transform: translate(-4px,2px); }
+  40% { transform: translate(4px,-2px); }
+  60% { transform: translate(-3px,1px); }
+  80% { transform: translate(3px,-1px); }
+  100% { transform: translate(0,0); }
+}
+
+/* 배경 */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bg .layer {
+  position: absolute;
+  inset: 0;
+  background-image: url("./bg.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+}
+
+/* 허용오차 */
 .tolerance-wrap {
   position: fixed;
   left: 50%;
@@ -39,20 +66,40 @@ body {
   border-radius: 14px;
   background: rgba(0,0,0,0.55);
   border: 1px solid rgba(255,255,255,0.14);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.45);
-  backdrop-filter: blur(3px);
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
   z-index: 10;
+  color: #fff;
 }
 
 .tolerance-wrap input[type="range"] {
   width: 100%;
 }
 
-/* ===== 하단 타이머 바 ===== */
+#tolOut {
+  color: #fff;
+}
+
+/* 결과창 */
+.result-wrap {
+  position: fixed;
+  left: 50%;
+  top: 80px;
+  transform: translateX(-50%);
+  width: min(720px, 92vw);
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,0,0,0.4);
+  color: #ff4d4d;
+  font-size: 14px;
+  z-index: 10;
+  display: none;
+}
+
+/* 타이머 바 */
 .slider-shell {
   position: fixed;
   left: 50%;
@@ -63,16 +110,9 @@ body {
   border-radius: 999px;
   background: rgba(0,0,0,0.65);
   border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
   overflow: hidden;
-
-  /* 게임 영역에서만 제스처 최소화 */
   touch-action: manipulation;
-  z-index: 5;
-}
-
-.slider-shell.locked {
-  pointer-events: none; /* 성공 사운드 나오는 동안 타이머바만 잠금 */
+  z-index: 10;
 }
 
 .slider-fill {
@@ -81,24 +121,25 @@ body {
   background: linear-gradient(90deg, #ff2a2a, #ff0000);
 }
 
-/* 성공 섬광 */
 .flash {
   position: fixed;
   inset: 0;
-  background: rgba(255, 0, 0, 0.35);
+  background: rgba(255,0,0,0.35);
   opacity: 0;
   pointer-events: none;
   transition: opacity 80ms linear;
   z-index: 20;
 }
 
-.flash.on {
-  opacity: 1;
-}
+.flash.on { opacity: 1; }
 </style>
 </head>
 
 <body>
+
+<div class="bg">
+  <div class="layer"></div>
+</div>
 
 <div class="tolerance-wrap">
   <div>허용오차</div>
@@ -106,21 +147,21 @@ body {
   <div><span id="tolOut">10.0</span> ms</div>
 </div>
 
+<div class="result-wrap" id="result"></div>
+
 <div class="slider-shell" id="gameArea">
   <div class="slider-fill" id="fill"></div>
 </div>
 
 <div class="flash" id="flash"></div>
 
-<audio id="successSound" src="gokuSen.mp3" preload="auto"></audio>
-
 <script>
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
-const sound = document.getElementById("successSound");
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
 const gameArea = document.getElementById("gameArea");
+const result = document.getElementById("result");
 
 let toleranceMs = parseFloat(tolInput.value);
 tolOut.textContent = toleranceMs.toFixed(1);
@@ -130,159 +171,105 @@ tolInput.addEventListener("input", () => {
   tolOut.textContent = toleranceMs.toFixed(1);
 });
 
-const TARGET_MS = 1000;   // 목표 1초
-const FADE_MS = 700;      // 페이드아웃 길이
-const TICK_MS = 20;
-
+const TARGET_MS = 1000;
 let running = false;
 let startPerf = 0;
-let locked = false;
 let raf = null;
 
-function loop() {
+/* WebAudio */
+let audioCtx;
+let successBuffer;
+
+async function initAudio(){
+  if(successBuffer) return;
+
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+
+  if(audioCtx.state === "suspended"){
+    await audioCtx.resume();
+  }
+
+  const res = await fetch("gokuSen.mp3",{cache:"force-cache"});
+  const array = await res.arrayBuffer();
+  successBuffer = await audioCtx.decodeAudioData(array);
+}
+
+function playSound(){
+  if(!successBuffer) return;
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = successBuffer;
+  src.connect(audioCtx.destination);
+  src.start(0);
+}
+
+function loop(){
   const elapsed = performance.now() - startPerf;
   const progress = Math.min(elapsed / TARGET_MS, 1);
   fill.style.width = (progress * 100) + "%";
   if (running) raf = requestAnimationFrame(loop);
 }
 
-function start() {
+function start(){
   running = true;
   startPerf = performance.now();
+  fill.style.width = "0%";
+  result.style.display = "none";
   raf = requestAnimationFrame(loop);
 }
 
-function stop() {
+function stop(){
   running = false;
   if (raf) cancelAnimationFrame(raf);
 
   const elapsed = performance.now() - startPerf;
-  const diff = Math.abs(elapsed - TARGET_MS);
-  if (diff <= toleranceMs) success();
-}
+  const progress = Math.min(elapsed / TARGET_MS, 1);
+  fill.style.width = (progress * 100) + "%";
 
-function resetBar() {
-  fill.style.width = "0%";
-  startPerf = 0;
-}
+  const diff = elapsed - TARGET_MS;
+  const absDiff = Math.abs(diff);
 
-function lockGameArea() {
-  locked = true;
-  gameArea.classList.add("locked");
-}
-
-function unlockGameArea() {
-  locked = false;
-  gameArea.classList.remove("locked");
-}
-
-function unlockAndReset() {
-  unlockGameArea();
-  resetBar();
-}
-
-function flashOn() {
-  flash.classList.add("on");
-  setTimeout(() => flash.classList.remove("on"), 120);
-}
-
-let fadeTimer = null;
-let fadeInterval = null;
-
-function clearFadeTimers() {
-  if (fadeTimer) clearTimeout(fadeTimer);
-  if (fadeInterval) clearInterval(fadeInterval);
-  fadeTimer = null;
-  fadeInterval = null;
-}
-
-function startFadeOut() {
-  clearFadeTimers();
-
-  const steps = Math.max(1, Math.floor(FADE_MS / TICK_MS));
-  const dec = 1 / steps;
-
-  fadeInterval = setInterval(() => {
-    sound.volume = Math.max(0, sound.volume - dec);
-    if (sound.volume <= 0.001) {
-      clearFadeTimers();
-      sound.pause();
-      sound.volume = 1;
-      unlockAndReset();
-    }
-  }, TICK_MS);
-}
-
-function scheduleFadeNearEnd() {
-  if (!Number.isFinite(sound.duration) || sound.duration <= 0) {
-    sound.addEventListener("loadedmetadata", scheduleFadeNearEnd, { once: true });
-    return;
-  }
-
-  const durationMs = sound.duration * 1000;
-  const startFadeAt = Math.max(0, durationMs - FADE_MS);
-
-  clearFadeTimers();
-  fadeTimer = setTimeout(startFadeOut, startFadeAt);
-}
-
-function success() {
-  lockGameArea();
-  flashOn();
-
-  clearFadeTimers();
-  sound.pause();
-  sound.currentTime = 0;
-  sound.volume = 1;
-
-  // 끝나면 무조건 풀기+초기화 (영구락 방지)
-  sound.onended = () => {
-    clearFadeTimers();
-    sound.volume = 1;
-    unlockAndReset();
-  };
-
-  const p = sound.play();
-
-  if (p && typeof p.then === "function") {
-    p.then(scheduleFadeNearEnd).catch(() => {
-      // 재생 실패 시(정책/파일문제) 바로 복구
-      unlockAndReset();
-    });
+  if (absDiff <= toleranceMs){
+    success();
   } else {
-    scheduleFadeNearEnd();
+    const direction = diff > 0 ? "늦음" : "빠름";
+    result.innerHTML = `실패 ❌ ${absDiff.toFixed(1)} ms ${direction}`;
+    result.style.display = "block";
   }
 }
 
-/* ===== 입력 통합 ===== */
-function toggle() {
-  if (locked) return;
-  if (!running) start();
+function success(){
+
+  document.body.classList.add("shake");
+  flash.classList.add("on");
+
+  playSound();
+
+  setTimeout(()=>{
+    flash.classList.remove("on");
+    document.body.classList.remove("shake");
+    fill.style.width = "0%";
+  },400);
+}
+
+function toggle(){
+  if(!running) start();
   else stop();
 }
 
-/* 키보드 Space (PC) */
-document.addEventListener("keydown", (e) => {
-  if (e.code !== "Space") return;
-  e.preventDefault();
-  toggle();
+document.addEventListener("keydown",(e)=>{
+  if(e.code==="Space"){
+    e.preventDefault();
+    initAudio();
+    toggle();
+  }
 });
 
-/* 모바일: 게임 바(아래 타이머바) 터치로만 토글 (슬라이더 터치 방해 X) */
-gameArea.addEventListener("touchstart", (e) => {
+gameArea.addEventListener("pointerdown",(e)=>{
   e.preventDefault();
-  toggle();
-}, { passive: false });
-
-/* PC: 게임 바 클릭으로도 토글 */
-gameArea.addEventListener("mousedown", () => {
+  initAudio();
   toggle();
 });
-
-/* 모바일: 첫 터치에서 오디오 준비(안전장치) */
-document.addEventListener("touchstart", () => {
-  sound.load();
-}, { once: true, passive: true });
 </script>
 
 </body>
