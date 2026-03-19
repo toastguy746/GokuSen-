@@ -112,7 +112,6 @@ body.shake {
   background: linear-gradient(90deg, #ff2a2a, #ff0000);
 }
 
-/* 기본 성공 플래시 (빨강) */
 .flash {
   position: fixed;
   inset: 0;
@@ -123,7 +122,6 @@ body.shake {
   z-index: 20;
 }
 
-/* 도전과제 플래시 (검정) */
 .flash-black {
   position: fixed;
   inset: 0;
@@ -139,6 +137,19 @@ body.shake {
   opacity: 1;
 }
 
+.lang-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 30;
+}
 </style>
 </head>
 
@@ -148,10 +159,12 @@ body.shake {
   <div class="layer"></div>
 </div>
 
+<div class="lang-toggle" id="langToggle">한국어 ∨</div>
+
 <div class="tolerance-wrap">
-  <div>허용오차</div>
-  <input id="tol" type="range" min="0.1" max="100" step="0.1" value="10">
-  <div><span id="tolOut">10.0</span> ms</div>
+  <div id="tolLabel">허용오차</div>
+  <input id="tol" type="range" min="0.001" max="0.1" step="0.001" value="0.01">
+  <div><span id="tolOut">0.010</span> s</div>
 </div>
 
 <div class="result-wrap" id="result"></div>
@@ -164,25 +177,69 @@ body.shake {
 <div class="flash-black" id="flashBlack"></div>
 
 <script>
-
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
 const flashBlack = document.getElementById("flashBlack");
 
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
+const tolLabel = document.getElementById("tolLabel");
 const gameArea = document.getElementById("gameArea");
 const result = document.getElementById("result");
 
-let toleranceMs = parseFloat(tolInput.value);
-tolOut.textContent = toleranceMs.toFixed(1);
+const langToggle = document.getElementById("langToggle");
 
-tolInput.addEventListener("input", () => {
-  toleranceMs = parseFloat(tolInput.value);
-  tolOut.textContent = toleranceMs.toFixed(1);
+let lang = "ko";
+
+// 추가된 변수
+let lastDiff = null;
+let lastDirection = null;
+
+const textMap = {
+  ko: {
+    tolerance: "허용오차",
+    fail: "실패",
+    late: "늦음",
+    early: "빠름",
+    langText: "한국어 ∨"
+  },
+  en: {
+    tolerance: "Tolerance",
+    fail: "Fail",
+    late: "Late",
+    early: "Early",
+    langText: "English ∨"
+  }
+};
+
+function updateLanguage(){
+  tolLabel.textContent = textMap[lang].tolerance;
+  langToggle.textContent = textMap[lang].langText;
+
+  if(lastDiff !== null){
+    const direction = lastDirection === "late"
+      ? textMap[lang].late
+      : textMap[lang].early;
+
+    result.innerHTML =
+      `${textMap[lang].fail} ${lastDiff.toFixed(3)} s ${direction}`;
+  }
+}
+
+langToggle.addEventListener("click", () => {
+  lang = (lang === "ko") ? "en" : "ko";
+  updateLanguage();
 });
 
-const TARGET_MS = 1000;
+let tolerance = parseFloat(tolInput.value);
+tolOut.textContent = tolerance.toFixed(3);
+
+tolInput.addEventListener("input", () => {
+  tolerance = parseFloat(tolInput.value);
+  tolOut.textContent = tolerance.toFixed(3);
+});
+
+const TARGET_S = 1;
 let running = false;
 let startPerf = 0;
 let raf = null;
@@ -192,13 +249,10 @@ let successBuffer;
 
 async function initAudio(){
   if(successBuffer) return;
-
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-
   if(audioCtx.state === "suspended"){
     await audioCtx.resume();
   }
-
   const res = await fetch("gokuSen.mp3",{cache:"force-cache"});
   const array = await res.arrayBuffer();
   successBuffer = await audioCtx.decodeAudioData(array);
@@ -206,7 +260,6 @@ async function initAudio(){
 
 function playSound(){
   if(!successBuffer) return;
-
   const src = audioCtx.createBufferSource();
   src.buffer = successBuffer;
   src.connect(audioCtx.destination);
@@ -214,8 +267,8 @@ function playSound(){
 }
 
 function loop(){
-  const elapsed = performance.now() - startPerf;
-  const progress = Math.min(elapsed / TARGET_MS, 1);
+  const elapsed = (performance.now() - startPerf) / 1000;
+  const progress = Math.min(elapsed / TARGET_S, 1);
   fill.style.width = (progress * 100) + "%";
   if (running) raf = requestAnimationFrame(loop);
 }
@@ -229,53 +282,52 @@ function start(){
 }
 
 function stop(){
-
   running = false;
   if (raf) cancelAnimationFrame(raf);
 
-  const elapsed = performance.now() - startPerf;
-  const progress = Math.min(elapsed / TARGET_MS, 1);
+  const elapsed = (performance.now() - startPerf) / 1000;
+  const progress = Math.min(elapsed / TARGET_S, 1);
   fill.style.width = (progress * 100) + "%";
 
-  const diff = elapsed - TARGET_MS;
+  const diff = elapsed - TARGET_S;
   const absDiff = Math.abs(diff);
 
-  if (absDiff <= toleranceMs){
+  if (absDiff <= tolerance){
     success();
   } else {
-    const direction = diff > 0 ? "늦음" : "빠름";
-    result.innerHTML = `실패 ${absDiff.toFixed(1)} ms ${direction}`;
+
+    // 여기 추가됨
+    lastDiff = absDiff;
+    lastDirection = diff > 0 ? "late" : "early";
+
+    const direction = lastDirection === "late"
+      ? textMap[lang].late
+      : textMap[lang].early;
+
+    result.innerHTML =
+      `${textMap[lang].fail} ${lastDiff.toFixed(3)} s ${direction}`;
     result.style.display = "block";
   }
 }
 
 function success(){
-
   document.body.classList.add("shake");
 
-  /* 도전과제 성공 (0.1ms) */
-  if(toleranceMs <= 0.1){
-
+  if(tolerance <= 0.001){
     flashBlack.classList.add("on");
-
     setTimeout(()=>{
       flashBlack.classList.remove("on");
       document.body.classList.remove("shake");
       fill.style.width = "0%";
     },400);
-
   } 
-  /* 일반 성공 */
   else {
-
     flash.classList.add("on");
-
     setTimeout(()=>{
       flash.classList.remove("on");
       document.body.classList.remove("shake");
       fill.style.width = "0%";
     },400);
-
   }
 
   playSound();
@@ -299,7 +351,6 @@ gameArea.addEventListener("pointerdown",(e)=>{
   initAudio();
   toggle();
 });
-
 </script>
 
 </body>
