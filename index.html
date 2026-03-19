@@ -14,8 +14,9 @@ html, body {
 }
 
 body {
-  min-height: 100vh;
-  overflow: hidden;
+  min-height: 200vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #000;
   touch-action: auto;
   -webkit-user-select: none;
@@ -150,6 +151,18 @@ body.shake {
   cursor: pointer;
   z-index: 30;
 }
+
+/* 수정된 부분 (흰색 영역) */
+.contact {
+  position: relative;
+  margin-top: 100vh;
+  background: #fff;
+  color: #000;
+  text-align: center;
+  font-size: 16px;
+  padding: 60px 0;
+  min-height: 300px;
+}
 </style>
 </head>
 
@@ -176,6 +189,11 @@ body.shake {
 <div class="flash" id="flash"></div>
 <div class="flash-black" id="flashBlack"></div>
 
+<!-- 이메일 영역 -->
+<div class="contact">
+  📧 Email: your@email.com
+</div>
+
 <script>
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
@@ -191,7 +209,6 @@ const langToggle = document.getElementById("langToggle");
 
 let lang = "ko";
 
-// 추가된 변수
 let lastDiff = null;
 let lastDirection = null;
 
@@ -295,8 +312,6 @@ function stop(){
   if (absDiff <= tolerance){
     success();
   } else {
-
-    // 여기 추가됨
     lastDiff = absDiff;
     lastDirection = diff > 0 ? "late" : "early";
 
