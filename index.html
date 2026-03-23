@@ -7,23 +7,29 @@
 
 <style>
 html, body {
-  height: 100%;
   margin: 0;
   padding: 0;
   background: #000;
+  /* 스크롤이 가능하도록 수정 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: sans-serif;
 }
 
-body {
-  min-height: 200vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+/* 1. 게임 영역: 화면 높이 100%(100vh)를 온전히 차지 */
+.game-section {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
   background: #000;
-  touch-action: auto;
+  touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
 }
 
-body.shake {
+/* 화면 흔들림 효과 (게임 영역만 흔들리도록 수정) */
+.game-section.shake {
   animation: screenShake 0.25s;
 }
 
@@ -36,8 +42,9 @@ body.shake {
   100% { transform: translate(0,0); }
 }
 
+/* 기존 fixed 요소들을 game-section 기준 absolute로 변경 */
 .bg {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   display: flex;
@@ -55,7 +62,7 @@ body.shake {
 }
 
 .tolerance-wrap {
-  position: fixed;
+  position: absolute;
   left: 50%;
   top: 22px;
   transform: translateX(-50%);
@@ -77,7 +84,7 @@ body.shake {
 }
 
 .result-wrap {
-  position: fixed;
+  position: absolute;
   left: 50%;
   top: 80px;
   transform: translateX(-50%);
@@ -93,9 +100,9 @@ body.shake {
 }
 
 .slider-shell {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  bottom: 50px;
+  bottom: 50px; /* 다시 원래 위치로 복구 */
   transform: translateX(-50%);
   width: min(600px, 90vw);
   height: 18px;
@@ -103,7 +110,6 @@ body.shake {
   background: rgba(0,0,0,0.65);
   border: 1px solid rgba(255,255,255,0.15);
   overflow: hidden;
-  touch-action: manipulation;
   z-index: 10;
 }
 
@@ -114,7 +120,7 @@ body.shake {
 }
 
 .flash {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(255,0,0,0.35);
   opacity: 0;
@@ -124,7 +130,7 @@ body.shake {
 }
 
 .flash-black {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.9);
   opacity: 0;
@@ -138,115 +144,78 @@ body.shake {
   opacity: 1;
 }
 
-.lang-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.6);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-  z-index: 30;
+/* 2. 스크롤 아래에 위치하는 정보성 이메일 칸 (흰색 배경) */
+.info-section {
+  background: #ffffff;
+  color: #333;
+  padding: 60px 20px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-/* 수정된 부분 (흰색 영역) */
-.contact {
-  position: relative;
-  margin-top: 100vh;
-  background: #fff;
+.info-section h2 {
+  margin: 0 0 10px 0;
+  font-size: 20px;
   color: #000;
-  text-align: center;
+}
+
+.info-section p {
+  margin: 0;
   font-size: 16px;
-  padding: 60px 0;
-  min-height: 300px;
+  color: #555;
+}
+
+.info-section a {
+  color: #ff2a2a;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.info-section a:hover {
+  text-decoration: underline;
 }
 </style>
 </head>
 
 <body>
 
-<div class="bg">
-  <div class="layer"></div>
+<div class="game-section" id="gameSection">
+  <div class="bg">
+    <div class="layer"></div>
+  </div>
+
+  <div class="tolerance-wrap">
+    <div>허용오차</div>
+    <input id="tol" type="range" min="0.001" max="0.1" step="0.001" value="0.01">
+    <div><span id="tolOut">0.010</span> s</div>
+  </div>
+
+  <div class="result-wrap" id="result"></div>
+
+  <div class="slider-shell" id="gameArea">
+    <div class="slider-fill" id="fill"></div>
+  </div>
+
+  <div class="flash" id="flash"></div>
+  <div class="flash-black" id="flashBlack"></div>
 </div>
 
-<div class="lang-toggle" id="langToggle">한국어 ∨</div>
-
-<div class="tolerance-wrap">
-  <div id="tolLabel">허용오차</div>
-  <input id="tol" type="range" min="0.001" max="0.1" step="0.001" value="0.01">
-  <div><span id="tolOut">0.010</span> s</div>
-</div>
-
-<div class="result-wrap" id="result"></div>
-
-<div class="slider-shell" id="gameArea">
-  <div class="slider-fill" id="fill"></div>
-</div>
-
-<div class="flash" id="flash"></div>
-<div class="flash-black" id="flashBlack"></div>
-
-<!-- 이메일 영역 -->
-<div class="contact">
-  📧 Email: your@email.com
+<div class="info-section">
+  <h2>Contact Info</h2>
+  <p>문의사항이나 피드백이 있다면 아래 이메일로 연락해주세요.</p>
+  <p style="margin-top: 15px;">이메일: <a href="mailto:toastguy8@gmail.com">toastguy8@gmail.com</a></p>
 </div>
 
 <script>
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
 const flashBlack = document.getElementById("flashBlack");
+const gameSection = document.getElementById("gameSection"); // 흔들림 효과를 위해 추가
 
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
-const tolLabel = document.getElementById("tolLabel");
 const gameArea = document.getElementById("gameArea");
 const result = document.getElementById("result");
-
-const langToggle = document.getElementById("langToggle");
-
-let lang = "ko";
-
-let lastDiff = null;
-let lastDirection = null;
-
-const textMap = {
-  ko: {
-    tolerance: "허용오차",
-    fail: "실패",
-    late: "늦음",
-    early: "빠름",
-    langText: "한국어 ∨"
-  },
-  en: {
-    tolerance: "Tolerance",
-    fail: "Fail",
-    late: "Late",
-    early: "Early",
-    langText: "English ∨"
-  }
-};
-
-function updateLanguage(){
-  tolLabel.textContent = textMap[lang].tolerance;
-  langToggle.textContent = textMap[lang].langText;
-
-  if(lastDiff !== null){
-    const direction = lastDirection === "late"
-      ? textMap[lang].late
-      : textMap[lang].early;
-
-    result.innerHTML =
-      `${textMap[lang].fail} ${lastDiff.toFixed(3)} s ${direction}`;
-  }
-}
-
-langToggle.addEventListener("click", () => {
-  lang = (lang === "ko") ? "en" : "ko";
-  updateLanguage();
-});
 
 let tolerance = parseFloat(tolInput.value);
 tolOut.textContent = tolerance.toFixed(3);
@@ -256,7 +225,7 @@ tolInput.addEventListener("input", () => {
   tolOut.textContent = tolerance.toFixed(3);
 });
 
-const TARGET_S = 1;
+const TARGET_S = 1; // 1초
 let running = false;
 let startPerf = 0;
 let raf = null;
@@ -266,10 +235,13 @@ let successBuffer;
 
 async function initAudio(){
   if(successBuffer) return;
+
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+
   if(audioCtx.state === "suspended"){
     await audioCtx.resume();
   }
+
   const res = await fetch("gokuSen.mp3",{cache:"force-cache"});
   const array = await res.arrayBuffer();
   successBuffer = await audioCtx.decodeAudioData(array);
@@ -277,6 +249,7 @@ async function initAudio(){
 
 function playSound(){
   if(!successBuffer) return;
+
   const src = audioCtx.createBufferSource();
   src.buffer = successBuffer;
   src.connect(audioCtx.destination);
@@ -284,7 +257,7 @@ function playSound(){
 }
 
 function loop(){
-  const elapsed = (performance.now() - startPerf) / 1000;
+  const elapsed = (performance.now() - startPerf) / 1000; 
   const progress = Math.min(elapsed / TARGET_S, 1);
   fill.style.width = (progress * 100) + "%";
   if (running) raf = requestAnimationFrame(loop);
@@ -312,35 +285,32 @@ function stop(){
   if (absDiff <= tolerance){
     success();
   } else {
-    lastDiff = absDiff;
-    lastDirection = diff > 0 ? "late" : "early";
-
-    const direction = lastDirection === "late"
-      ? textMap[lang].late
-      : textMap[lang].early;
-
-    result.innerHTML =
-      `${textMap[lang].fail} ${lastDiff.toFixed(3)} s ${direction}`;
+    const direction = diff > 0 ? "늦음" : "빠름";
+    result.innerHTML = `실패 ${absDiff.toFixed(3)} s ${direction}`;
     result.style.display = "block";
   }
 }
 
 function success(){
-  document.body.classList.add("shake");
+  // body 대신 gameSection이 흔들리도록 수정
+  gameSection.classList.add("shake");
 
   if(tolerance <= 0.001){
     flashBlack.classList.add("on");
+
     setTimeout(()=>{
       flashBlack.classList.remove("on");
-      document.body.classList.remove("shake");
+      gameSection.classList.remove("shake");
       fill.style.width = "0%";
     },400);
+
   } 
   else {
     flash.classList.add("on");
+
     setTimeout(()=>{
       flash.classList.remove("on");
-      document.body.classList.remove("shake");
+      gameSection.classList.remove("shake");
       fill.style.width = "0%";
     },400);
   }
@@ -355,7 +325,8 @@ function toggle(){
 
 document.addEventListener("keydown",(e)=>{
   if(e.code==="Space"){
-    e.preventDefault();
+    // 스크롤이 내려가는 현상을 막기 위해 preventDefault 유지
+    e.preventDefault(); 
     initAudio();
     toggle();
   }
@@ -366,6 +337,7 @@ gameArea.addEventListener("pointerdown",(e)=>{
   initAudio();
   toggle();
 });
+
 </script>
 
 </body>
