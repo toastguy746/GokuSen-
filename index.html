@@ -3,20 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>흑섬</title>
+<title>흑섬 - Black Flash</title>
 
 <style>
 html, body {
   margin: 0;
   padding: 0;
   background: #000;
-  /* 스크롤이 가능하도록 수정 */
   overflow-x: hidden;
   overflow-y: auto;
   font-family: sans-serif;
 }
 
-/* 1. 게임 영역: 화면 높이 100%(100vh)를 온전히 차지 */
 .game-section {
   position: relative;
   width: 100%;
@@ -28,7 +26,7 @@ html, body {
   user-select: none;
 }
 
-/* 화면 흔들림 효과 (게임 영역만 흔들리도록 수정) */
+/* 화면 흔들림 효과 */
 .game-section.shake {
   animation: screenShake 0.25s;
 }
@@ -42,7 +40,6 @@ html, body {
   100% { transform: translate(0,0); }
 }
 
-/* 기존 fixed 요소들을 game-section 기준 absolute로 변경 */
 .bg {
   position: absolute;
   inset: 0;
@@ -99,16 +96,21 @@ html, body {
   display: none;
 }
 
+/* [수정 포인트] 슬라이더 테두리: 검붉은색 + 글로우 효과 */
 .slider-shell {
   position: absolute;
   left: 50%;
-  bottom: 50px; /* 다시 원래 위치로 복구 */
+  bottom: 50px;
   transform: translateX(-50%);
   width: min(600px, 90vw);
   height: 18px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.65);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.8);
+  
+  /* 검붉은색 테두리와 살짝 빛나는 효과 */
+  border: 2px solid #4a0000; 
+  box-shadow: 0 0 15px rgba(139, 0, 0, 0.6), inset 0 0 10px rgba(139, 0, 0, 0.4);
+  
   overflow: hidden;
   z-index: 10;
 }
@@ -116,7 +118,8 @@ html, body {
 .slider-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #ff2a2a, #ff0000);
+  background: linear-gradient(90deg, #660000, #ff0000);
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
 .flash {
@@ -132,7 +135,7 @@ html, body {
 .flash-black {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.9);
+  background: rgba(0,0,0,0.95); /* 더 깊은 어둠 */
   opacity: 0;
   pointer-events: none;
   transition: opacity 80ms linear;
@@ -144,7 +147,6 @@ html, body {
   opacity: 1;
 }
 
-/* 2. 스크롤 아래에 위치하는 정보성 이메일 칸 (흰색 배경) */
 .info-section {
   background: #ffffff;
   color: #333;
@@ -203,14 +205,14 @@ html, body {
 <div class="info-section">
   <h2>Contact Info</h2>
   <p>문의사항이나 피드백이 있다면 아래 이메일로 연락해주세요.</p>
-  <p style="margin-top: 15px;">이메일: <a href="mailto:your_email@example.com">your_email@example.com</a></p>
+  <p style="margin-top: 15px;">이메일: <a href="mailto:toastguy8@gmail.com">toastguy8@gmail.com</a></p>
 </div>
 
 <script>
 const fill = document.getElementById("fill");
 const flash = document.getElementById("flash");
 const flashBlack = document.getElementById("flashBlack");
-const gameSection = document.getElementById("gameSection"); // 흔들림 효과를 위해 추가
+const gameSection = document.getElementById("gameSection");
 
 const tolInput = document.getElementById("tol");
 const tolOut = document.getElementById("tolOut");
@@ -225,7 +227,7 @@ tolInput.addEventListener("input", () => {
   tolOut.textContent = tolerance.toFixed(3);
 });
 
-const TARGET_S = 1; // 1초
+const TARGET_S = 1;
 let running = false;
 let startPerf = 0;
 let raf = null;
@@ -235,13 +237,10 @@ let successBuffer;
 
 async function initAudio(){
   if(successBuffer) return;
-
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-
   if(audioCtx.state === "suspended"){
     await audioCtx.resume();
   }
-
   const res = await fetch("gokuSen.mp3",{cache:"force-cache"});
   const array = await res.arrayBuffer();
   successBuffer = await audioCtx.decodeAudioData(array);
@@ -249,7 +248,6 @@ async function initAudio(){
 
 function playSound(){
   if(!successBuffer) return;
-
   const src = audioCtx.createBufferSource();
   src.buffer = successBuffer;
   src.connect(audioCtx.destination);
@@ -292,29 +290,24 @@ function stop(){
 }
 
 function success(){
-  // body 대신 gameSection이 흔들리도록 수정
   gameSection.classList.add("shake");
 
   if(tolerance <= 0.001){
     flashBlack.classList.add("on");
-
     setTimeout(()=>{
       flashBlack.classList.remove("on");
       gameSection.classList.remove("shake");
       fill.style.width = "0%";
     },400);
-
   } 
   else {
     flash.classList.add("on");
-
     setTimeout(()=>{
       flash.classList.remove("on");
       gameSection.classList.remove("shake");
       fill.style.width = "0%";
     },400);
   }
-
   playSound();
 }
 
@@ -325,7 +318,6 @@ function toggle(){
 
 document.addEventListener("keydown",(e)=>{
   if(e.code==="Space"){
-    // 스크롤이 내려가는 현상을 막기 위해 preventDefault 유지
     e.preventDefault(); 
     initAudio();
     toggle();
@@ -337,7 +329,6 @@ gameArea.addEventListener("pointerdown",(e)=>{
   initAudio();
   toggle();
 });
-
 </script>
 
 </body>
